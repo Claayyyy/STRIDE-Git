@@ -459,3 +459,98 @@ output$projectDetailTable <- DT::renderDT(server = TRUE, {
     formatCurrency('Allocation', currency = 'PhP') %>%
     formatPercentage('Completion', digits = 1)
 })
+# =========================================================
+# --- INFRASTRUCTURE REPORT GENERATOR (Fixed) ---
+# =========================================================
+
+output$generate_report_infra <- downloadHandler(
+  filename = function() {
+    # File name changes based on the active panel
+    tab_name <- gsub(" ", "_", input$infra_tabs)
+    paste("Infrastructure_", tab_name, "_Report_", Sys.Date(), ".html", sep = "")
+  },
+  content = function(file) {
+    # 1. Notify
+    id <- showNotification("Generating Report...", duration = NULL, closeButton = FALSE)
+    on.exit(removeNotification(id), add = TRUE)
+    
+    # 2. Template
+    tempReport <- file.path(tempdir(), "report.Rmd")
+    file.copy("report.Rmd", tempReport, overwrite = TRUE)
+    
+    # 3. FILTER DATA
+    data_infra <- EFD_Projects
+    
+    if (!is.null(input$selected_region) && length(input$selected_region) > 0) {
+      data_infra <- data_infra %>% filter(Region %in% input$selected_region)
+    }
+    
+    if (!is.null(input$selected_division) && length(input$selected_division) > 0) {
+      data_infra <- data_infra %>% filter(Division %in% input$selected_division)
+    }
+    
+    # 4. PREPARE METRICS (Based on Active Panel)
+    final_report_data <- data.frame()
+    active_panel <- input$infra_tabs # Gets "Allocation Overview" or "Completion Overview"
+    
+    # --- LOGIC SWITCH ---
+    if (active_panel == "Allocation Overview") {
+      
+      # Metric A: Category
+      metric_a <- data_infra %>%
+        group_by(Category) %>%
+        summarise(Value = sum(Allocation, na.rm = TRUE)) %>%
+        mutate(Metric = "Total Allocation by Category") %>%
+        ungroup()
+      
+      # Metric B: Year
+      metric_b <- data_infra %>%
+        group_by(FundingYear) %>%
+        summarise(Value = sum(Allocation, na.rm = TRUE)) %>%
+        mutate(Category = as.character(FundingYear)) %>%
+        mutate(Metric = "Total Allocation by Year") %>%
+        select(Category, Metric, Value) %>%
+        ungroup()
+      
+      final_report_data <- bind_rows(metric_a, metric_b)
+      
+    } else if (active_panel == "Completion Overview") {
+      
+      # Metric C: Completion
+      metric_c <- data_infra %>%
+        group_by(Category) %>%
+        summarise(Value = mean(Completion, na.rm = TRUE)) %>%
+        mutate(Metric = "Average Completion Rate (%)") %>%
+        ungroup()
+      
+      final_report_data <- metric_c
+    }
+    
+    # 5. PARAMETERS
+    all_metrics <- unique(final_report_data$Metric)
+    metric_names_list <- setNames(as.list(all_metrics), all_metrics)
+    
+    current_region <- if(is.null(input$selected_region)) "All Regions" else paste(input$selected_region, collapse=", ")
+    current_div <- if(is.null(input$selected_division)) "All Divisions" else paste(input$selected_division, collapse=", ")
+    
+    params_list <- list(
+      data = final_report_data,
+      metrics = all_metrics,
+      state = list(
+        level = paste("Custom Selection -", active_panel),
+        region = current_region,
+        division = current_div,
+        municipality = NULL
+      ),
+      metric_names = metric_names_list
+    )
+    
+    # 6. RENDER
+    rmarkdown::render(
+      tempReport,
+      output_file = file,
+      params = params_list,
+      envir = new.env(parent = globalenv())
+    )
+  }
+)

@@ -734,3 +734,94 @@ observeEvent(input$advanced_data_table_rows_selected, {
   })
   
 })
+# # =========================================================
+# # --- ADVANCED ANALYTICS REPORT GENERATOR ---
+# # =========================================================
+# 
+# output$generate_report_adv <- downloadHandler(
+#   filename = function() {
+#     paste("Advanced_Analytics_Report_", Sys.Date(), ".html", sep = "")
+#   },
+#   content = function(file) {
+#     # 1. Notify User
+#     id <- showNotification("Generating Report...", duration = NULL, closeButton = FALSE)
+#     on.exit(removeNotification(id), add = TRUE)
+#     
+#     # 2. Prepare Template
+#     tempReport <- file.path(tempdir(), "report.Rmd")
+#     file.copy("report.Rmd", tempReport, overwrite = TRUE)
+#     
+#     # 3. GET DATA
+#     # We grab the filtered data currently shown in the Advanced Analytics table
+#     # 'drilled_data_and_level()' is the reactive that holds your filtered table
+#     req(drilled_data_and_level())
+#     raw_data <- drilled_data_and_level()$data
+#     
+#     # 4. SUMMARIZE DATA FOR CHARTS
+#     # We summarize the list of schools into counts so the report can draw bars
+#     final_report_data <- data.frame()
+#     
+#     # --- A. Region Breakdown ---
+#     if ("Region" %in% names(raw_data)) {
+#       summ_reg <- raw_data %>%
+#         group_by(Region) %>%
+#         tally(name = "Value") %>%
+#         rename(Category = Region) %>%
+#         mutate(Metric = "Distribution by Region") %>%
+#         ungroup()
+#       final_report_data <- bind_rows(final_report_data, summ_reg)
+#     }
+#     
+#     # --- B. Division Breakdown ---
+#     if ("Division" %in% names(raw_data)) {
+#       summ_div <- raw_data %>%
+#         group_by(Division) %>%
+#         tally(name = "Value") %>%
+#         rename(Category = Division) %>%
+#         mutate(Metric = "Distribution by Division") %>%
+#         ungroup()
+#       final_report_data <- bind_rows(final_report_data, summ_div)
+#     }
+#     
+#     # --- C. School Type Breakdown (if available) ---
+#     # Tries to find "School.Type" or "Sector" columns
+#     type_col <- NULL
+#     if ("School.Type" %in% names(raw_data)) type_col <- "School.Type"
+#     else if ("Sector" %in% names(raw_data)) type_col <- "Sector"
+#     
+#     if (!is.null(type_col)) {
+#       summ_type <- raw_data %>%
+#         group_by(.data[[type_col]]) %>%
+#         tally(name = "Value") %>%
+#         rename(Category = .data[[type_col]]) %>%
+#         mutate(Metric = "Distribution by School Type") %>%
+#         ungroup()
+#       final_report_data <- bind_rows(final_report_data, summ_type)
+#     }
+#     
+#     # 5. PREPARE PARAMETERS
+#     # Get unique list of metrics for the report loop
+#     all_metrics <- unique(final_report_data$Metric)
+#     metric_names_list <- setNames(as.list(all_metrics), all_metrics)
+#     
+#     params_list <- list(
+#       data = final_report_data,
+#       metrics = all_metrics,
+#       state = list(
+#         level = "Advanced Filter Selection",
+#         region = "Custom Filtered Data",
+#         division = NULL,
+#         municipality = NULL
+#       ),
+#       metric_names = metric_names_list
+#     )
+#     
+#     # 6. RENDER
+#     rmarkdown::render(
+#       tempReport,
+#       output_file = file,
+#       params = params_list,
+#       envir = new.env(parent = globalenv())
+#     )
+#   }
+# )

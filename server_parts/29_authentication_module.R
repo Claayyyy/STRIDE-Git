@@ -58,7 +58,7 @@ authentication_server <- function(input, output, session, user_status,
                      tags$input(id = ns("login_pass"), type = "password", class = "form-control", placeholder = "Password"),
                      tags$span(class = "input-group-text toggle-password", `data-target` = ns("login_pass"), HTML('<i class="fa fa-eye" aria-hidden="true"></i>'))
             ),
-            actionButton(ns("do_login"), "Sign In", class = "btn-login w-100"),
+            actionButton(ns("do_login"), "Sign In", class = "btn-login w-100 btn-enter-login"),
             uiOutput(ns("login_message")),
             br(),
             actionLink(ns("btn_register"), "Create an account", class = "register-link"),
@@ -146,7 +146,7 @@ authentication_server <- function(input, output, session, user_status,
                        tags$span(class = "input-group-text toggle-password", `data-target` = ns("reg_pass_confirm"), HTML('<i class="fa fa-eye" aria-hidden="true"></i>'))
               ),
               
-              actionButton(ns("do_register"), "Register Account", class = "btn-login w-100"),
+              actionButton(ns("do_register"), "Register Account", class = "btn-login w-100 btn-enter-register"),
               uiOutput(ns("register_message")),
               br(),
               actionLink(ns("btn_login"), "Back to Login", class = "register-link"),
@@ -252,7 +252,7 @@ authentication_server <- function(input, output, session, user_status,
       easyClose = FALSE,
       footer = tagList(
         modalButton("Cancel"),
-        actionButton("submit_guest_info", "Continue", class = "btn btn-primary")
+        actionButton("submit_guest_info", "Continue", class = "btn btn-primary btn-enter-guest")
       ),
       textInput("guest_name", "Full Name"),
       textInput("guest_email", "Email Address (optional)"),

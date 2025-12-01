@@ -107,6 +107,42 @@ login_register_UI <- function(id) {
   ns <- NS(id)
   
   tagList(
+    tags$script(HTML("
+      $(document).on('keyup', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          
+          // --- 1. GUEST MODAL (Highest Priority) ---
+          var guestBtn = $('.btn-enter-guest'); // Look for the class we added
+          if (guestBtn.length > 0 && guestBtn.is(':visible')) {
+             guestBtn.click();
+             e.preventDefault(); 
+             return; 
+          }
+
+          // --- 2. REGISTER PAGE ---
+          // Check if the Register button (with our class) is visible
+          var regBtn = $('.btn-enter-register');
+          if (regBtn.length > 0 && regBtn.is(':visible')) {
+             
+             // CHECK: Is the button ENABLED? (User finished answering)
+             if (!regBtn.prop('disabled') && !regBtn.hasClass('disabled')) {
+                regBtn.click();
+             }
+             e.preventDefault(); 
+             return;
+          }
+
+          // --- 3. LOGIN PAGE ---
+          // Check if the Login button (with our class) is visible
+          var loginBtn = $('.btn-enter-login');
+          if (loginBtn.length > 0 && loginBtn.is(':visible')) {
+             loginBtn.click();
+             e.preventDefault(); 
+             return;
+          }
+        }
+      });
+    ")),
     # ✅ Animated gradient background (no bubbles)
     div(class = "login-bg gradient-animated"),
     

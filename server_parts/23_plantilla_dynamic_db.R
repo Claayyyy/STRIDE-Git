@@ -475,3 +475,101 @@ observe({
     }
   })
 })
+# =========================================================
+# --- PLANTILLA REPORT GENERATOR (Fixed for dfGMIS) ---
+# =========================================================
+
+output$generate_report_plantilla <- downloadHandler(
+  filename = function() {
+    paste("Plantilla_Report_", Sys.Date(), ".html", sep = "")
+  },
+  content = function(file) {
+    # 1. Notify User
+    id <- showNotification("Generating Plantilla Report...", duration = NULL, closeButton = FALSE)
+    on.exit(removeNotification(id), add = TRUE)
+    
+    # 2. Prepare Template
+    tempReport <- file.path(tempdir(), "report.Rmd")
+    # Make sure report.Rmd is in your app directory so it can be copied
+    file.copy("report.Rmd", tempReport, overwrite = TRUE)
+    
+    # 3. GET SELECTIONS & STATE
+    # We use the Picker Input because that holds the final list of selected positions
+    selected_pos <- input$selected_positions
+    state <- plantilla_drill_state()
+    if (is.null(state)) state <- list(region = NULL)
+    
+    # 4. PROCESS DATA
+    # Since Plantilla doesn't have a single reactive, we rebuild the data from dfGMIS
+    final_report_data <- data.frame()
+    
+    # Determine grouping (Region vs Division) based on drill-down
+    group_col <- "GMIS.Region"
+    current_level <- "Region"
+    
+    if (!is.null(state$region)) {
+      group_col <- "GMIS.Division"
+      current_level <- "Division"
+    }
+    
+    # Loop through each selected position to calculate Filled/Unfilled stats
+    for (pos in selected_pos) {
+      
+      # A. Filter the raw data for this Position
+      d <- dfGMIS %>% filter(Position == pos)
+      
+      # B. Filter by Region if drilled down
+      if (!is.null(state$region)) {
+        d <- d %>% filter(GMIS.Region == state$region)
+      }
+      
+      # C. Summarize (Filled vs Unfilled)
+      # We create TWO entries for the report: one for Filled, one for Unfilled
+      summ <- d %>%
+        group_by(.data[[group_col]]) %>%
+        summarise(
+          Filled = sum(Total.Filled, na.rm=TRUE),
+          Unfilled = sum(Total.Unfilled, na.rm=TRUE)
+        ) %>%
+        rename(Category = .data[[group_col]])
+      
+      # Create "Filled" rows
+      f_rows <- summ %>% 
+        select(Category, Value = Filled) %>% 
+        mutate(Metric = paste(pos, "(Filled)"))
+      
+      # Create "Unfilled" rows
+      u_rows <- summ %>% 
+        select(Category, Value = Unfilled) %>% 
+        mutate(Metric = paste(pos, "(Unfilled)"))
+      
+      # Combine
+      final_report_data <- bind_rows(final_report_data, f_rows, u_rows)
+    }
+    
+    # 5. PREPARE PARAMETERS
+    # Create the list of metric names for the report titles
+    all_metrics <- unique(final_report_data$Metric)
+    metric_names_list <- setNames(as.list(all_metrics), all_metrics)
+    
+    params_list <- list(
+      data = final_report_data,
+      metrics = all_metrics,
+      state = list(
+        level = current_level,
+        region = state$region,
+        division = NULL,
+        municipality = NULL
+      ),
+      metric_names = metric_names_list
+    )
+    
+    # 6. RENDER
+    rmarkdown::render(
+      tempReport,
+      output_file = file,
+      params = params_list,
+      envir = new.env(parent = globalenv())
+    )
+  }
+)

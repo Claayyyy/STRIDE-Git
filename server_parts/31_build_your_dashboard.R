@@ -1574,3 +1574,302 @@ output$schooldetails_specialization <- renderTable({
   make_bold(df)
 }, striped = TRUE, hover = TRUE, bordered = TRUE, width = "100%", 
 align = 'c', colnames = FALSE, sanitize.text.function = function(x) x)
+
+# =======================================================
+#  STRIDE CHATBOT LOGIC (V6 - ROBUST & SELF-HEALING)
+# =======================================================
+
+# Debug Message (Check your RStudio Console to see if this prints)
+print("STRIDE CHATBOT: Loading Logic...")
+
+# 1. Initialize Chat History
+chat_state <- reactiveValues(
+  history = list(
+    list(role = "bot", content = "<b>Hello! I am STRIDER</b> 👋<br>I can analyze the entire STRIDE database.<br>Try: <i>'Highest STEM enrollment in Region VII'</i>")
+  )
+)
+
+# 2. Render Chat Interface
+output$chat_ui_container <- renderUI({
+  tags$div(class = "chat-history",
+           lapply(chat_state$history, function(msg) {
+             tags$div(class = paste0("msg-row ", msg$role),
+                      tags$div(class = "msg-bubble", HTML(msg$content))
+             )
+           })
+  )
+})
+
+# 3. Handle 'Send' Button
+observeEvent(input$chat_send_btn, {
+  print("CHATBOT: Button Clicked!") # Debug Print
+  
+  user_text <- trimws(input$chat_msg_input)
+  req(user_text != "")
+  
+  # A. Add User Message
+  chat_state$history[[length(chat_state$history) + 1]] <- list(role = "user", content = user_text)
+  
+  # B. Clear Input
+  updateTextInput(session, "chat_msg_input", value = "")
+  
+  # C. Process Logic
+  bot_reply <- "Thinking..."
+  
+  tryCatch({
+    if(!exists("uni")) {
+      bot_reply <- "<b>System Error:</b> The 'uni' dataset is not loaded."
+    } else {
+      bot_reply <- get_chatbot_response(user_text, uni)
+    }
+  }, error = function(e) {
+    print(paste("CHATBOT CRASH:", e$message))
+    bot_reply <- "I encountered an internal error. Please check the R console."
+  })
+  
+  # D. Add Bot Message
+  chat_state$history[[length(chat_state$history) + 1]] <- list(role = "bot", content = bot_reply)
+  
+  # E. Scroll
+  session$sendCustomMessage("scrollToBottom", "go")
+})
+
+# 4. THE BRAIN (Comprehensive & Safe)
+get_chatbot_response <- function(query, df) {
+  query_clean <- tolower(query)
+  
+  # --- A. DETECT SORTING ---
+  sort_descending <- TRUE
+  sort_label <- "Highest"
+  if (grepl("lowest|least|bottom|smallest", query_clean)) {
+    sort_descending <- FALSE
+    sort_label <- "Lowest"
+  }
+  
+  # --- B. DETECT METRIC ---
+  metric <- NULL
+  metric_name <- ""
+  
+  # 1. TEACHERS & HR
+  if (grepl("teacher", query_clean)) {
+    level <- "Total"
+    if(grepl("elem", query_clean)) level <- "ES"
+    if(grepl("jhs", query_clean)) level <- "JHS"
+    if(grepl("shs", query_clean)) level <- "SHS"
+    
+    if(grepl("excess", query_clean)) {
+      metric <- paste0(level, ".Excess")
+      # Fix for "Total" case if naming differs
+      if(level=="Total") metric <- "Total.Excess" 
+      metric_name <- paste(level, "Teacher Excess")
+    } else {
+      metric <- paste0(level, ".Shortage")
+      if(level=="Total") metric <- "Total.Shortage"
+      metric_name <- paste(level, "Teacher Shortage")
+    }
+  }
+  
+  # 2. ENROLLMENT (Grade Specific)
+  else if (grepl("enroll|learner|student", query_clean)) {
+    if (grepl("stem", query_clean)) { metric <- "G12.STEM"; metric_name <- "STEM Enrollment" }
+    else if (grepl("kinder", query_clean)) { metric <- "Kinder"; metric_name <- "Kinder Enrollment" }
+    else if (grepl("grade 12|g12", query_clean)) { metric <- "G12"; metric_name <- "Grade 12 Enrollment" }
+    else if (grepl("grade 7|g7", query_clean)) { metric <- "G7"; metric_name <- "Grade 7 Enrollment" }
+    else if (grepl("shs", query_clean)) { metric <- "SHS.Enrolment"; metric_name <- "SHS Enrollment" }
+    else { metric <- "TotalEnrolment"; metric_name <- "Total Enrollment" }
+  }
+  
+  # 3. INFRASTRUCTURE
+  else if (grepl("room|class", query_clean)) {
+    if (grepl("condem", query_clean)) { metric <- "Number.of.Rooms_Condemned...For.Demolition"; metric_name <- "Condemned Rooms" }
+    else if (grepl("shortage", query_clean)) { metric <- "Classroom.Shortage"; metric_name <- "Classroom Shortage" }
+    else { metric <- "Instructional.Rooms.2023.2024"; metric_name <- "Instructional Rooms" }
+  }
+  else if (grepl("building", query_clean)) {
+    if (grepl("condem", query_clean)) { metric <- "Building.Count_Condemned...For.Demolition"; metric_name <- "Condemned Buildings" }
+    else if (grepl("repair", query_clean)) { metric <- "Building.Count_Needs.Major.Repair"; metric_name <- "Damaged Buildings" }
+    else { metric <- "Buildings"; metric_name <- "Total Buildings" }
+  }
+  
+  # 4. UTILITIES & OTHERS
+  else if (grepl("internet", query_clean)) { metric <- "No.Internet"; metric_name <- "Schools No Internet" }
+  else if (grepl("water", query_clean)) { metric <- "No.Piped.Water"; metric_name <- "Schools No Water" }
+  else if (grepl("electric", query_clean)) { metric <- "No.Grid.Electricity"; metric_name <- "Schools No Power" }
+  else if (grepl("seat|furniture", query_clean)) { metric <- "Total.Seats.Shortage"; metric_name <- "Seat Shortage" }
+  
+  # --- FALLBACK & CLEANUP ---
+  if (is.null(metric)) return("I didn't catch that. Try asking about <b>Teachers, Enrollment, Rooms, Buildings, Internet, or Seats</b>.")
+  
+  # Handle Naming Variations (Dot vs Underscore)
+  if (!metric %in% names(df)) {
+    metric_alt <- gsub("\\.", "_", metric)
+    if (metric_alt %in% names(df)) { metric <- metric_alt }
+    else { 
+      # Last ditch: try removing years or specific suffixes
+      return(paste0("Sorry, data for <b>", metric_name, "</b> isn't in the loaded dataset.")) 
+    }
+  }
+  
+  # --- C. CONTEXT (Filter by Location) ---
+  found_region <- NULL
+  found_division <- NULL
+  
+  # Robust Region Scan (Ignore Blanks)
+  if ("Region" %in% names(df)) {
+    # Smart Roman Numeral Mapping
+    roman_map <- list("1"="I", "2"="II", "3"="III", "4a"="IV-A", "4b"="IV-B", "5"="V", "6"="VI", "7"="VII", "8"="VIII", "9"="IX", "10"="X", "11"="XI", "12"="XII", "13"="CARAGA", "ncr"="NCR", "car"="CAR", "barmm"="BARMM")
+    for (k in names(roman_map)) {
+      if (grepl(paste0("region ", k), query_clean) || grepl(paste0("region", k), query_clean)) {
+        target <- roman_map[[k]]
+        matches <- grep(target, unique(df$Region), ignore.case=TRUE, value=TRUE)
+        if(length(matches)>0) found_region <- matches[1]
+        break
+      }
+    }
+    # Standard Scan if no Roman Numeral found
+    if(is.null(found_region)) {
+      regs <- unique(as.character(df$Region))
+      regs <- regs[!is.na(regs) & nchar(regs) > 0] # Remove blanks
+      for (r in regs) {
+        if (grepl(tolower(r), query_clean, fixed=TRUE)) { found_region <- r; break }
+      }
+    }
+  }
+  
+  # Robust Division Scan
+  if ("Division" %in% names(df)) {
+    divs <- unique(as.character(df$Division))
+    divs <- divs[!is.na(divs) & nchar(divs) > 0] # Remove blanks
+    for (d in divs) {
+      if (grepl(tolower(d), query_clean, fixed=TRUE)) { found_division <- d; break }
+    }
+  }
+  
+  # Apply Filters
+  filtered_df <- df
+  context <- "Nationwide"
+  
+  if (!is.null(found_division)) {
+    filtered_df <- filtered_df %>% filter(Division == found_division)
+    context <- paste("in", found_division)
+  } else if (!is.null(found_region)) {
+    filtered_df <- filtered_df %>% filter(Region == found_region)
+    context <- paste("in", found_region)
+  }
+  
+  # --- D. GROUPING (Drill Down) ---
+  group_col <- "Region"
+  group_label <- "Regions"
+  
+  if (grepl("school", query_clean)) { group_col <- "School.Name"; group_label <- "Schools" }
+  else if (grepl("municipality", query_clean)) { group_col <- "Municipality"; group_label <- "Municipalities" }
+  else if (grepl("division", query_clean)) { group_col <- "Division"; group_label <- "Divisions" }
+  else {
+    # Auto-Drill
+    if (!is.null(found_division)) { group_col <- "School.Name"; group_label <- "Schools" }
+    else if (!is.null(found_region)) { group_col <- "Division"; group_label <- "Divisions" }
+  }
+  
+  if (!group_col %in% names(df)) return(paste("Error: Grouping column", group_label, "missing."))
+  
+  # --- E. CALCULATE ---
+  tryCatch({
+    stats <- filtered_df %>%
+      group_by(.data[[group_col]]) %>%
+      summarise(Value = {
+        val_col <- .data[[metric]]
+        if(is.numeric(val_col)) sum(val_col, na.rm=TRUE)
+        else {
+          # Handle Text Numbers
+          clean <- gsub(",", "", as.character(val_col))
+          if (all(grepl("^[0-9.]+$", clean[!is.na(clean) & clean!=""]))) sum(as.numeric(clean), na.rm=TRUE)
+          else sum(!is.na(val_col) & val_col != "" & val_col != "0" & tolower(val_col) != "no")
+        }
+      })
+    
+    if (sort_descending) stats <- stats %>% arrange(desc(Value)) else stats <- stats %>% arrange(Value)
+    stats <- head(stats, 5)
+    
+    if (nrow(stats) == 0) return(paste("No data found for", metric_name, context))
+    
+    rows <- lapply(1:nrow(stats), function(i) {
+      name <- stats[[group_col]][i]
+      if(is.na(name) || name=="") name <- "Unknown"
+      val <- format(stats$Value[i], big.mark=",")
+      paste0("<tr><td>", i, ". ", name, "</td><td class='val'>", val, "</td></tr>")
+    })
+    
+    return(paste0(
+      sort_label, " 5 <b>", group_label, "</b> for <b>", metric_name, "</b> (", context, "):<br>",
+      "<table class='bot-table'>", paste(rows, collapse=""), "</table>"
+    ))
+    
+  }, error = function(e) { return("Calculation Error. Please try a simpler query.") })
+}
+
+# Ensure UI updates even when tab is hidden
+outputOptions(output, "chat_ui_container", suspendWhenHidden = FALSE)
+
+# --- REPORT GENERATOR (Fixed for Categorical Data) ---
+output$generate_report <- downloadHandler(
+  filename = function() {
+    paste("STRIDE_Report_", Sys.Date(), ".html", sep = "")
+  },
+  content = function(file) {
+    # 1. Notify User
+    id <- showNotification("Generating Report...", duration = NULL, closeButton = FALSE)
+    on.exit(removeNotification(id), add = TRUE)
+    
+    # 2. Prepare Template
+    tempReport <- file.path(tempdir(), "report.Rmd")
+    file.copy("report.Rmd", tempReport, overwrite = TRUE)
+    
+    # 3. INTELLIGENT DATA PREPARATION
+    # We grab the standard summary data first
+    final_data <- summarized_data_long()
+    
+    # We also need the raw data to calculate text categories correctly
+    raw_df <- filtered_data()
+    selected_metrics <- all_selected_metrics()
+    
+    # Loop through selected metrics to fix the "Text" ones
+    for (m in selected_metrics) {
+      
+      # Check if the column exists and is strictly CHARACTER/TEXT (not numeric)
+      if (m %in% names(raw_df) && is.character(raw_df[[m]])) {
+        
+        # Calculate the breakdown (Count of Small, Medium, Large, etc.)
+        cat_summary <- raw_df %>%
+          group_by(.data[[m]]) %>%
+          tally(name = "Value") %>%
+          rename(Category = .data[[m]]) %>%
+          mutate(Metric = m) %>%
+          mutate(Category = ifelse(is.na(Category) | Category == "", "Unknown", Category)) %>%
+          ungroup() %>%
+          select(Category, Metric, Value)
+        
+        # Remove the "Bad" calculation (sum of text) from the standard data
+        final_data <- final_data %>% filter(Metric != m)
+        
+        # Add our "Good" calculation
+        final_data <- bind_rows(final_data, cat_summary)
+      }
+    }
+    
+    # 4. Define Parameters
+    params_list <- list(
+      data = final_data,                # The fixed data
+      metrics = selected_metrics,   
+      state = global_drill_state(),       
+      metric_names = clean_metric_choices 
+    )
+    
+    # 5. Render
+    rmarkdown::render(
+      tempReport,
+      output_file = file,
+      params = params_list,
+      envir = new.env(parent = globalenv())
+    )
+  }
+)

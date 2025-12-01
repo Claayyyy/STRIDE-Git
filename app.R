@@ -29,7 +29,8 @@ library(pool)
 library(reactable)
 library(reactablefmtr)
 library(rintrojs)
-
+library(webshot)
+library(tinytex)
 
 # HROD Data Upload
 

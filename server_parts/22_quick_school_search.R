@@ -10,6 +10,23 @@ output$TextMapping <- renderLeaflet({
     addLayersControl(baseGroups = c("Satellite", "Road Map"))
 })
 
+# --- OBSERVER FOR CLEAR FILTERS BUTTON ---
+observeEvent(input$clear_qss_filters, {
+  
+  # Reset Region
+  updatePickerInput(session, "qss_region", selected = character(0))
+  
+  # Reset Division
+  updatePickerInput(session, "qss_division", selected = character(0))
+  
+  # Reset Legislative District
+  updatePickerInput(session, "qss_legdist", selected = character(0))
+  
+  # Reset Municipality
+  updatePickerInput(session, "qss_municipality", selected = character(0))
+  
+})
+
 # --- 2. Update Picker Choices Dynamically ---
 
 observeEvent(input$search_mode, {
