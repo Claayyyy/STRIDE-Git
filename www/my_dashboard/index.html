@@ -2,258 +2,454 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>InsightEd PWA</title>
     
-    <title>School Insights Data</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="images/In-Site.png">
-    <link rel="stylesheet" href="style.css">
-    <meta name="theme-color" content="#2a8c4a">
+    <meta name="theme-color" content="#0038A8">
+
+    <!-- React Dependencies -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <style>
+        /* --- GLOBAL & LAYOUT --- */
+        html, body { height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; overflow-x: hidden; }
+        .background-shapes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0038A8 0%, #002163 100%); z-index: 1; pointer-events: none; }
+        .shape { position: absolute; border-radius: 50%; opacity: 0.6; filter: blur(40px); }
+        .shape-1 { width: 300px; height: 300px; background: #0056b3; top: -50px; left: -50px; }
+        .shape-2 { width: 400px; height: 400px; background: #FDB913; bottom: -100px; right: -100px; opacity: 0.2; }
+        
+        /* --- LOADING --- */
+        .loading-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; z-index: 9999; background: #f3f4f6; }
+        .spinner { border: 5px solid rgba(0, 56, 168, 0.3); border-top: 5px solid #0038A8; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- AUTH CARDS --- */
+        .auth-wrapper { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; z-index: 2000; overflow-y: auto; padding: 20px 0; }
+        .auth-card { background: rgba(255,255,255,0.98); padding: 30px; width: 90%; max-width: 500px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; margin: auto; }
+        
+        /* --- FORM STYLES --- */
+        .form-section-title { color: #0038A8; border-bottom: 2px solid #FDB913; padding-bottom: 5px; margin-top: 25px; margin-bottom: 15px; font-weight: bold; font-size: 1.1rem; }
+        .form-control { width: 100%; padding: 12px; margin-bottom: 12px; background: #f3f4f6; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .form-col { flex: 1; min-width: 120px; }
+        label { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; display: block; }
+        
+        .btn { width: 100%; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; border: none; margin-top: 10px; transition: 0.2s; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-primary { background: #0038A8; color: white; }
+        .btn-secondary { background: transparent; color: #0038A8; border: 2px solid #FDB913; }
+        .btn-google { background: white; color: #555; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .text-error { color: red; text-align: center; display: block; margin-bottom: 10px; font-size: 0.9em; }
+
+        /* --- APP UI --- */
+        .app-layout { height: 100vh; display: flex; flex-direction: column; position: relative; z-index: 10; background: #fff; }
+        .app-header { padding: 15px; border-bottom: 1px solid #eee; text-align: center; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .content-area { flex-grow: 1; padding: 20px; overflow-y: auto; max-width: 800px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+        .footer-nav { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; background: white; }
+        .step-indicator { display: flex; justify-content: center; gap: 5px; margin-top: 10px; }
+        .step { width: 25px; height: 25px; border-radius: 50%; background: #eee; color: #555; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+        .step.active { background: #2a8c4a; color: white; }
+        h4 { color: #0038A8; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+    </style>
 </head>
 <body>
 
-    <section id="landingPage">
-        <h1>Welcome to InsightEd!</h1>
-        <p>Offline Data Collection Tool</p>
-        <button type="button" id="startSurveyBtn">School Data</button>
-    </section>
+    <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+    </div>
 
-    <section id="appContainer">
+    <div id="root"></div>
 
-        <header class="app-header">
-            <h1>STRIDE Data Entry Form</h1>
-            <p>This form can be filled out offline. Progress is saved automatically.</p>
+    <script type="text/babel">
+
+        // --- 1. CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYRVZtXlGELDM9uo8x63C90ljg-xmWQ5o",
+            authDomain: "insighted-b07d2.firebaseapp.com",
+            projectId: "insighted-b07d2",
+            storageBucket: "insighted-b07d2.firebasestorage.app",
+            messagingSenderId: "812117773472",
+            appId: "1:812117773472:web:69a6ee212bf73cabe44dc5"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+        // --- 2. DB UTILS ---
+        const DB_NAME = 'surveyDB';
+        const saveToDB = (data) => {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = e => e.target.result.createObjectStore('surveys', { keyPath: 'id', autoIncrement: true });
+                req.onsuccess = e => {
+                    const tx = e.target.result.transaction(['surveys'], 'readwrite');
+                    tx.objectStore('surveys').add(data);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                };
+            });
+        };
+
+        // --- 3. COMPONENTS ---
+
+        const LoadingScreen = () => <div className="loading-container"><div className="spinner"></div></div>;
+
+        const LoginCard = ({ onSwitch }) => {
+            const [email, setEmail] = React.useState('');
+            const [pass, setPass] = React.useState('');
+            const [error, setError] = React.useState('');
+            const [loading, setLoading] = React.useState(false);
+
+            const handleLogin = async (e) => {
+                e.preventDefault(); setLoading(true); setError('');
+                try { await auth.signInWithEmailAndPassword(email, pass); } 
+                catch(err) { setError(err.message); setLoading(false); }
+            };
+            const handleGoogle = async () => {
+                try {
+                    const res = await auth.signInWithPopup(googleProvider);
+                    if (!res.user.email.endsWith('@deped.gov.ph')) {
+                        await res.user.delete(); await auth.signOut(); setError("Restricted: Use @deped.gov.ph email");
+                    }
+                } catch(err) { setError(err.message); }
+            };
+
+            return (
+                <div className="auth-wrapper">
+                    <div className="auth-card">
+                        <h2 style={{color:'#0038A8', textAlign:'center'}}>Welcome Back</h2>
+                        <form onSubmit={handleLogin}>
+                            <label>Email</label>
+                            <input className="form-control" type="email" value={email} onChange={e=>setEmail(e.target.value)} required />
+                            <label>Password</label>
+                            <input className="form-control" type="password" value={pass} onChange={e=>setPass(e.target.value)} required />
+                            {error && <span className="text-error">{error}</span>}
+                            <button className="btn btn-primary" type="submit" disabled={loading}>{loading?'...':'Sign In'}</button>
+                        </form>
+                        <button className="btn btn-google" onClick={handleGoogle}>Google Login</button>
+                        <div style={{textAlign:'center', margin:'15px', color:'#999'}}>OR</div>
+                        <button className="btn btn-secondary" onClick={onSwitch}>Create Account</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const RegisterCard = ({ onSwitch }) => {
+            const [form, setForm] = React.useState({
+                officeType: '', division: '', position: '', 
+                fname: '', mname: '', lname: '', birthdate: '', age: '',
+                addr_region: '', addr_province: '', addr_muni: '',
+                email: '', pass: '', confirm: ''
+            });
+            const [csvData, setCsvData] = React.useState([]);
+            const [addrData, setAddrData] = React.useState({});
+            const [error, setError] = React.useState('');
+            const [loading, setLoading] = React.useState(false);
+
+            React.useEffect(() => {
+                // Load Positions
+                fetch('positions.csv').then(r=>r.text()).then(t => {
+                    const lines = t.trim().split('\n');
+                    const headers = lines[0].split(',');
+                    const parsed = lines.slice(1).map(l => {
+                        const v = l.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(i => i.replace(/^"|"$/g, '').trim());
+                        let obj = {}; headers.forEach((h,i) => obj[h] = v[i]); return obj;
+                    });
+                    setCsvData(parsed);
+                }).catch(e => {
+                    console.warn("CSV Error:", e);
+                    setCsvData([]);
+                });
+
+                // Load Addresses
+                fetch('https://raw.githubusercontent.com/isaacdarcilla/philippine-addresses/main/region-province-city-barangay-2020.json')
+                    .then(r=>r.json()).then(d => setAddrData(d));
+            }, []);
+
+            // Auto-Age
+            React.useEffect(() => {
+                if(form.birthdate) {
+                    const age = Math.abs(new Date(Date.now() - new Date(form.birthdate).getTime()).getUTCFullYear() - 1970);
+                    setForm(f => ({...f, age}));
+                }
+            }, [form.birthdate]);
+
+            // Filters
+            // 1. Divisions: Since Region is gone, we just show ALL unique divisions from the CSV
+            const divisions = React.useMemo(() => {
+                return [...new Set(csvData.map(i => i['Division']))].sort();
+            }, [csvData]);
             
-            <div class="step-indicator">
-                <div class="step active">1</div>
-                <div class="step">2</div>
-                <div class="step">3</div>
-                <div class="step">4</div>
-                <div class="step">5</div>
-                <div class="step">6</div>
-                <div class="step">7</div>
-                <div class="step">8</div>
-            </div>
-        </header>
+            // 2. Positions: Show ALL unique positions, regardless of office or division selection
+            const positions = React.useMemo(() => {
+                return [...new Set(csvData.map(i => i['Position']))].sort();
+            }, [csvData]);
 
-        <form id="surveyForm" class="form-container">
+            // Address Dropdowns
+            const addrRegs = Object.keys(addrData).map(k=>({code:k, name:addrData[k].region_name}));
+            const addrProvinces = (form.addr_region && addrData[form.addr_region]) ? Object.keys(addrData[form.addr_region].province_list) : [];
+            const addrMunis = (form.addr_region && form.addr_province) ? 
+                (Array.isArray(addrData[form.addr_region].province_list[form.addr_province].municipality_list) 
+                ? addrData[form.addr_region].province_list[form.addr_province].municipality_list 
+                : Object.keys(addrData[form.addr_region].province_list[form.addr_province].municipality_list)) : [];
+
+            const handleChange = e => setForm({...form, [e.target.name]: e.target.value});
+
+            const handleReg = async (e) => {
+                e.preventDefault();
+                if(form.pass !== form.confirm) return setError("Passwords mismatch");
+                if(form.pass.length < 6) return setError("Password too short");
+                setLoading(true); setError('');
+                try {
+                    const cred = await auth.createUserWithEmailAndPassword(form.email, form.pass);
+                    await cred.user.updateProfile({ displayName: `${form.fname} ${form.lname}` });
+                    alert("Account Created!");
+                } catch(err) { setError(err.message); setLoading(false); }
+            };
+
+            return (
+                <div className="auth-wrapper">
+                    <div className="auth-card">
+                        <h2 style={{color:'#0038A8', textAlign:'center'}}>Create Account</h2>
+                        <form onSubmit={handleReg}>
+                            
+                            <div className="form-section-title">1. Office & Position</div>
+                            <label>Office Type</label>
+                            <select className="form-control" name="officeType" value={form.officeType} onChange={handleChange} required>
+                                <option value="">Select...</option>
+                                <option value="Central Office">Central Office</option>
+                                <option value="Regional Office">Regional Office</option>
+                                <option value="School Division Office">SDO</option>
+                                <option value="School">School</option>
+                            </select>
+
+                            {/* Removed Region Dropdown */}
+
+                            {(form.officeType === 'School Division Office' || form.officeType === 'School') && (
+                                <div>
+                                    <label>Division</label>
+                                    <select className="form-control" name="division" value={form.division} onChange={handleChange} required>
+                                        <option value="">Select Division...</option>
+                                        {divisions.map(d=><option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                </div>
+                            )}
+
+                            {form.officeType === 'School' && (
+                                <div className="form-row">
+                                    <div className="form-col"><label>School ID</label><input className="form-control" name="schoolID" required /></div>
+                                    <div className="form-col" style={{flex:2}}><label>School Name</label><input className="form-control" name="schoolName" required /></div>
+                                </div>
+                            )}
+
+                            <label>Position (All Positions)</label>
+                            <select className="form-control" name="position" value={form.position} onChange={handleChange} required>
+                                <option value="">Select Position...</option>
+                                {positions.map(p=><option key={p} value={p}>{p}</option>)}
+                            </select>
+
+                            <div className="form-section-title">2. Personal Info</div>
+                            <div className="form-row">
+                                <div className="form-col"><label>First Name</label><input className="form-control" name="fname" value={form.fname} onChange={handleChange} required /></div>
+                                <div className="form-col" style={{flex:0.5}}><label>M.I.</label><input className="form-control" name="mname" value={form.mname} onChange={handleChange} /></div>
+                            </div>
+                            <label>Last Name</label><input className="form-control" name="lname" value={form.lname} onChange={handleChange} required />
+                            <div className="form-row">
+                                <div className="form-col"><label>Birthdate</label><input className="form-control" type="date" name="birthdate" value={form.birthdate} onChange={handleChange} required /></div>
+                                <div className="form-col"><label>Age</label><input className="form-control" value={form.age} readOnly style={{background:'#eee'}} /></div>
+                            </div>
+
+                            <div className="form-section-title">3. Address</div>
+                            <label>Region</label>
+                            <select className="form-control" name="addr_region" value={form.addr_region} onChange={handleChange} required>
+                                <option value="">Select Region...</option>
+                                {addrRegs.map(r=><option key={r.code} value={r.code}>{r.name}</option>)}
+                            </select>
+                            <div className="form-row">
+                                <div className="form-col"><label>Province</label>
+                                    <select className="form-control" name="addr_province" value={form.addr_province} onChange={handleChange} required>
+                                        <option value="">Select...</option>
+                                        {addrProvinces.map(p=><option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                                <div className="form-col"><label>Municipality</label>
+                                    <select className="form-control" name="addr_muni" value={form.addr_muni} onChange={handleChange} required>
+                                        <option value="">Select...</option>
+                                        {addrMunis.map(m=><option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="form-section-title">4. Credentials</div>
+                            <label>DepEd Email</label><input className="form-control" type="email" name="email" value={form.email} onChange={handleChange} required />
+                            <label>Password</label><input className="form-control" type="password" name="pass" value={form.pass} onChange={handleChange} required />
+                            <label>Confirm</label><input className="form-control" type="password" name="confirm" value={form.confirm} onChange={handleChange} required />
+
+                            {error && <span className="text-error">{error}</span>}
+                            <button className="btn btn-primary" style={{backgroundColor:'#FDB913', color:'#0038A8'}} disabled={loading}>{loading?'...':'Sign Up'}</button>
+                        </form>
+                        <button className="btn btn-secondary" style={{marginTop:'10px', border:'none'}} onClick={onSwitch}>Back to Login</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const SurveyApp = ({ user, onLogout }) => {
+            const [step, setStep] = React.useState(0);
+            const [data, setData] = React.useState({});
             
-            <main class="content-area">
-                
-                <div class="form-page active" data-page="0">
-                    <h2>School Profile</h2>
-                    <div class="form-group">
-                        <label for="school_id">School ID:</label>
-                        <input type="text" id="school_id" name="school_id" placeholder="e.g. 193849">
-                    </div>
-                    <div class="form-group">
-                        <label for="school_name">School Name:</label>
-                        <input type="text" id="school_name" name="school_name" placeholder="e.g. Juan Dela Cruz Elementary School">
-                    </div>
-                    <div class="form-group">
-                        <label for="stride_region">Region:</label>
-                        <select id="stride_region" name="stride_region">
-                            <option value="">--- Select a Region ---</option>
-                            <option value="Region I">Region I</option>
-                            <option value="Region II">Region II</option>
-                            <option value="Region III">Region III</option>
-                            <option value="Region IV-A">Region IV-A</option>
-                            <option value="MIMAROPA">MIMAROPA</option>
-                            <option value="Region V">Region V</option>
-                            <option value="Region VI">Region VI</option>
-                            <option value="NIR">NIR</option>
-                            <option value="Region VII">Region VII</option>
-                            <option value="Region VIII">Region VIII</option>
-                            <option value="Region IX">Region IX</option>
-                            <option value="Region X">Region X</option>
-                            <option value="Region XI">Region XI</option>
-                            <option value="Region XII">Region XII</option>
-                            <option value="CARAGA">CARAGA</option>
-                            <option value="CAR">CAR</option>
-                            <option value="NCR">NCR</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="stride_division">Division:</label>
-                        <select id="stride_division" name="stride_division">
-                            <option value="">--- Select Division ---</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="curricular_offering">Filter Curricular Offering:</label>
-                        <select id="curricular_offering" name="curricular_offering">
-                            <option value="">--- Select a Curricular Offering ---</option>
-                            <option value="Purely ES">Purely ES</option>
-                            <option value="Purely JHS">Purely JHS</option>
-                            <option value="Purely SHS">Purely SHS</option>
-                            <option value="JHS and SHS">JHS and SHS</option>
-                            <option value="ES and JHS">ES and JHS</option>
-                            <option value="All Offering">All Offering</option>
-                        </select>
-                    </div>
-                </div>
+            const handleChange = e => setData({...data, [e.target.name]: e.target.value});
+            const handleSubmit = async () => {
+                if(!confirm("Submit Data?")) return;
+                try {
+                    await saveToDB({...data, uploader: user.email, timestamp: new Date().toISOString()});
+                    alert("Saved Offline!");
+                    setData({}); setStep(0);
+                } catch(e) { alert("Error: "+e.message); }
+            };
 
-                <div class="form-page" data-page="1">
-                    <h2>School Information (School Head)</h2>
-                    <div class="form-row">
-                        <div class="form-group form-col-4">
-                            <label for="school_head_gn">Given Name:</label>
-                            <input type="text" id="school_head_gn" name="school_head_gn" placeholder="Enter Given Name">
+            const renderStep = () => {
+                switch(step) {
+                    case 0: return (
+                        <div>
+                            <h4>School Profile</h4>
+                            <label>School ID</label><input className="form-control" name="school_id" value={data.school_id||''} onChange={handleChange} />
+                            <label>School Name</label><input className="form-control" name="school_name" value={data.school_name||''} onChange={handleChange} />
+                            <label>Region</label><select className="form-control" name="region" value={data.region||''} onChange={handleChange}><option>Select</option><option>Region I</option><option>NCR</option></select>
+                            <label>Division</label><input className="form-control" name="division" value={data.division||''} onChange={handleChange} />
+                            <label>Curricular Offering</label><select className="form-control" name="offering" value={data.offering||''} onChange={handleChange}><option>Purely ES</option><option>Purely JHS</option></select>
                         </div>
-                        <div class="form-group form-col-4">
-                            <label for="school_head_mn">Middle Name:</label>
-                            <input type="text" id="school_head_mn" name="school_head_mn" placeholder="Enter Middle Name">
+                    );
+                    case 1: return (
+                        <div>
+                            <h4>School Head Info</h4>
+                            <div className="form-row">
+                                <div className="form-col"><label>Given Name</label><input className="form-control" name="head_gn" value={data.head_gn||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Last Name</label><input className="form-control" name="head_ln" value={data.head_ln||''} onChange={handleChange} /></div>
+                            </div>
+                            <label>Position</label><input className="form-control" name="head_pos" value={data.head_pos||''} onChange={handleChange} />
+                            <label>Contact No.</label><input className="form-control" type="tel" name="head_tel" value={data.head_tel||''} onChange={handleChange} />
+                            <label>Email</label><input className="form-control" type="email" name="head_email" value={data.head_email||''} onChange={handleChange} />
                         </div>
-                        <div class="form-group form-col-4">
-                            <label for="school_head_ln">Last Name:</label>
-                            <input type="text" id="school_head_ln" name="school_head_ln" placeholder="Enter Last Name">
+                    );
+                    case 2: return (
+                        <div>
+                            <h4>Enrolment per Grade</h4>
+                            <div className="form-row">
+                                <div className="form-col"><label>Grade 1</label><input type="number" className="form-control" name="g1" value={data.g1||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Grade 2</label><input type="number" className="form-control" name="g2" value={data.g2||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Grade 3</label><input type="number" className="form-control" name="g3" value={data.g3||''} onChange={handleChange} /></div>
+                            </div>
+                            <div className="form-row">
+                                <div className="form-col"><label>Grade 4</label><input type="number" className="form-control" name="g4" value={data.g4||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Grade 5</label><input type="number" className="form-control" name="g5" value={data.g5||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Grade 6</label><input type="number" className="form-control" name="g6" value={data.g6||''} onChange={handleChange} /></div>
+                            </div>
+                        </div>
+                    );
+                    case 3: return (
+                        <div>
+                            <h4>Organized Classes</h4>
+                            <p>Enter number of classes per grade level</p>
+                            <div className="form-row">
+                                <div className="form-col"><label>Grade 1</label><input type="number" className="form-control" name="og1" value={data.og1||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Grade 2</label><input type="number" className="form-control" name="og2" value={data.og2||''} onChange={handleChange} /></div>
+                            </div>
+                            {/* Add other grades similarly */}
+                        </div>
+                    );
+                    case 4: return (
+                        <div>
+                            <h4>Teaching Personnel</h4>
+                            <label>Total ES Teachers</label><input type="number" className="form-control" name="teach_es" value={data.teach_es||''} onChange={handleChange} />
+                            <label>Total JHS Teachers</label><input type="number" className="form-control" name="teach_jhs" value={data.teach_jhs||''} onChange={handleChange} />
+                            <label>Total SHS Teachers</label><input type="number" className="form-control" name="teach_shs" value={data.teach_shs||''} onChange={handleChange} />
+                        </div>
+                    );
+                    case 5: return (
+                        <div>
+                            <h4>Infrastructure</h4>
+                            <div className="form-row">
+                                <div className="form-col"><label>ES Rooms</label><input type="number" className="form-control" name="infra_es" value={data.infra_es||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>JHS Rooms</label><input type="number" className="form-control" name="infra_jhs" value={data.infra_jhs||''} onChange={handleChange} /></div>
+                            </div>
+                            <label>Buildings for Repair</label><input type="number" className="form-control" name="infra_repair" value={data.infra_repair||''} onChange={handleChange} />
+                        </div>
+                    );
+                    case 6: return (
+                        <div>
+                            <h4>Resources</h4>
+                            <div className="form-row">
+                                <div className="form-col"><label>Laptops</label><input type="number" className="form-control" name="res_laptop" value={data.res_laptop||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Chairs</label><input type="number" className="form-control" name="res_chairs" value={data.res_chairs||''} onChange={handleChange} /></div>
+                            </div>
+                            <div className="form-row">
+                                <div className="form-col"><label>Printers</label><input type="number" className="form-control" name="res_print" value={data.res_print||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>TVs</label><input type="number" className="form-control" name="res_tv" value={data.res_tv||''} onChange={handleChange} /></div>
+                            </div>
+                        </div>
+                    );
+                    case 7: return (
+                        <div>
+                            <h4>Teacher Specialization</h4>
+                            <div className="form-row">
+                                <div className="form-col"><label>English</label><input type="number" className="form-control" name="spec_eng" value={data.spec_eng||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Math</label><input type="number" className="form-control" name="spec_math" value={data.spec_math||''} onChange={handleChange} /></div>
+                                <div className="form-col"><label>Science</label><input type="number" className="form-control" name="spec_sci" value={data.spec_sci||''} onChange={handleChange} /></div>
+                            </div>
+                        </div>
+                    );
+                    default: return <div>Done</div>;
+                }
+            };
+
+            return (
+                <div className="app-layout">
+                    <div className="app-header">
+                        <h3>STRIDE Data Entry</h3>
+                        <div className="step-indicator">
+                            {[0,1,2,3,4,5,6,7].map(i => <div key={i} className={`step ${step===i?'active':''}`}>{i+1}</div>)}
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="school_head_position">Plantilla Position:</label>
-                        <select id="school_head_position" name="school_head_position">
-                            <option value="School Principal I">School Principal I</option>
-                            <option value="School Principal II">School Principal II</option>
-                            <option value="School Principal III">School Principal III</option>
-                        </select>
+                    <div className="content-area">
+                        {renderStep()}
                     </div>
-                    <div class="form-row">
-                        <div class="form-group form-col-6">
-                            <label for="school_head_contact">Contact Number:</label>
-                            <input type="tel" id="school_head_contact" name="school_head_contact" placeholder="e.g. 09129382923">
-                        </div>
-                        <div class="form-group form-col-6">
-                            <label for="school_head_contact_alt">Alternative Contact Number:</label>
-                            <input type="tel" id="school_head_contact_alt" name="school_head_contact_alt" placeholder="e.g. 09122314424">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group form-col-6">
-                            <label for="school_head_email">DepEd Email Address:</label>
-                            <input type="email" id="school_head_email" name="school_head_email" placeholder="e.g. juan.delacruz@deped.gov.ph">
-                        </div>
-                        <div class="form-group form-col-6">
-                            <label for="school_head_email_alt">Alternative Email Address:</label>
-                            <input type="email" id="school_head_email_alt" name="school_head_email_alt" placeholder="e.g. juan.delacruz@gmail.com">
-                        </div>
+                    <div className="footer-nav">
+                        {step > 0 && <button className="btn btn-secondary" onClick={()=>setStep(step-1)}>Back</button>}
+                        {step < 7 ? <button className="btn btn-primary" onClick={()=>setStep(step+1)}>Next</button> : <button className="btn btn-primary" onClick={handleSubmit}>Submit</button>}
+                        <button className="btn" style={{background:'#aa4a4a', color:'white', width:'auto', padding:'0 20px'}} onClick={onLogout}>Logout</button>
                     </div>
                 </div>
+            );
+        };
 
-                <div class="form-page" data-page="2">
-                    <h2>Enrolment per Grade Level</h2>
-                    <div class="form-row">
-                        <div class="form-group form-col-4"><label for="g1">Grade 1:</label><input type="number" id="g1" name="g1" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g2">Grade 2:</label><input type="number" id="g2" name="g2" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g3">Grade 3:</label><input type="number" id="g3" name="g3" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g4">Grade 4:</label><input type="number" id="g4" name="g4" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g5">Grade 5:</label><input type="number" id="g5" name="g5" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g6">Grade 6:</label><input type="number" id="g6" name="g6" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g7">Grade 7:</label><input type="number" id="g7" name="g7" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g8">Grade 8:</label><input type="number" id="g8" name="g8" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g9">Grade 9:</label><input type="number" id="g9" name="g9" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g10">Grade 10:</label><input type="number" id="g10" name="g10" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g11">Grade 11:</label><input type="number" id="g11" name="g11" min="0"></div>
-                        <div class="form-group form-col-4"><label for="g12">Grade 12:</label><input type="number" id="g12" name="g12" min="0"></div>
-                    </div>
-                </div>
+        // --- MAIN ---
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const [view, setView] = React.useState('login');
 
-                <div class="form-page" data-page="3">
-                    <h2>Organized Classes per Grade Level</h2>
-                    <div class="form-row">
-                        <div class="form-group form-col-4"><label for="org_g1">Grade 1:</label><input type="number" id="org_g1" name="org_g1" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g2">Grade 2:</label><input type="number" id="org_g2" name="org_g2" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g3">Grade 3:</label><input type="number" id="org_g3" name="org_g3" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g4">Grade 4:</label><input type="number" id="org_g4" name="org_g4" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g5">Grade 5:</label><input type="number" id="org_g5" name="org_g5" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g6">Grade 6:</label><input type="number" id="org_g6" name="org_g6" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g7">Grade 7:</label><input type="number" id="org_g7" name="org_g7" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g8">Grade 8:</label><input type="number" id="org_g8" name="org_g8" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g9">Grade 9:</label><input type="number" id="org_g9" name="org_g9" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g10">Grade 10:</label><input type="number" id="org_g10" name="org_g10" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g11">Grade 11:</label><input type="number" id="org_g11" name="org_g11" min="0"></div>
-                        <div class="form-group form-col-4"><label for="org_g12">Grade 12:</label><input type="number" id="org_g12" name="org_g12" min="0"></div>
-                    </div>
-                </div>
+            React.useEffect(() => auth.onAuthStateChanged(u => { setUser(u); setLoading(false); }), []);
 
-                <div class="form-page" data-page="4">
-                    <h2>Number of Teaching Personnel</h2>
-                    <div class="form-row">
-                        <div class="form-group form-col-4"><label for="teaching_elem">Total ES Teachers:</label><input type="number" id="teaching_elem" name="teaching_elem" min="0"></div>
-                        <div class="form-group form-col-4"><label for="teaching_jhs">Total JHS Teachers:</label><input type="number" id="teaching_jhs" name="teaching_jhs" min="0"></div>
-                        <div class="form-group form-col-4"><label for="teaching_shs">Total SHS Teachers:</label><input type="number" id="teaching_shs" name="teaching_shs" min="0"></div>
-                    </div>
-                </div>
+            if (loading) return <LoadingScreen />;
+            if (!user) return view === 'login' ? <LoginCard onSwitch={()=>setView('register')} /> : <RegisterCard onSwitch={()=>setView('login')} />;
+            return <SurveyApp user={user} onLogout={()=>auth.signOut()} />;
+        };
 
-                <div class="form-page" data-page="5">
-                    <h2>School Infrastructure</h2>
-                    <div class="form-row">
-                        <div class="form-group form-col-4"><label for="instructional_rooms_es">Classrooms for ES:</label><input type="number" id="instructional_rooms_es" name="instructional_rooms_es" min="0"></div>
-                        <div class="form-group form-col-4"><label for="instructional_rooms_jhs">Classrooms for JHS:</label><input type="number" id="instructional_rooms_jhs" name="instructional_rooms_jhs" min="0"></div>
-                        <div class="form-group form-col-4"><label for="instructional_rooms_shs">Classrooms for SHS:</label><input type="number" id="instructional_rooms_shs" name="instructional_rooms_shs" min="0"></div>
-                        <div class="form-group form-col-4"><label for="instructional_rooms_repair">Classrooms for Repair:</label><input type="number" id="instructional_rooms_repair" name="instructional_rooms_repair" min="0"></div>
-                        <div class="form-group form-col-4"><label for="buildings">Number of Buildings:</label><input type="number" id="buildings" name="buildings" min="0"></div>
-                        <div class="form-group form-col-4"><label for="buildings_repair">Buildings for Repair:</label><input type="number" id="buildings_repair" name="buildings_repair" min="0"></div>
-                    </div>
-                </div>
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 
-                <div class="form-page" data-page="6">
-                    <h2>School Resources</h2>
-                    <div class="form-row">
-                        <div class="form-group form-col-3"><label for="laptops">Laptops:</label><input type="number" id="laptops" name="laptops" min="0"></div>
-                        <div class="form-group form-col-3"><label for="laptops_repair">Laptops for Repair:</label><input type="number" id="laptops_repair" name="laptops_repair" min="0"></div>
-                        <div class="form-group form-col-3"><label for="chairs">Chairs:</label><input type="number" id="chairs" name="chairs" min="0"></div>
-                        <div class="form-group form-col-3"><label for="chairs_repair">Chairs for Repair:</label><input type="number" id="chairs_repair" name="chairs_repair" min="0"></div>
-                        <div class="form-group form-col-3"><label for="desk">Desks:</label><input type="number" id="desk" name="desk" min="0"></div>
-                        <div class="form-group form-col-3"><label for="desk_repair">Desks for Repair:</label><input type="number" id="desk_repair" name="desk_repair" min="0"></div>
-                        <div class="form-group form-col-3"><label for="ecart">e-carts:</label><input type="number" id="ecart" name="ecart" min="0"></div>
-                        <div class="form-group form-col-3"><label for="ecart_repair">e-carts for Repair:</label><input type="number" id="ecart_repair" name="ecart_repair" min="0"></div>
-                        <div class="form-group form-col-3"><label for="toilet">Toilets:</label><input type="number" id="toilet" name="toilet" min="0"></div>
-                        <div class="form-group form-col-3"><label for="toilet_repair">Toilets for Repair:</label><input type="number" id="toilet_repair" name="toilet_repair" min="0"></div>
-                        <div class="form-group form-col-3"><label for="printer">Printers:</label><input type="number" id="printer" name="printer" min="0"></div>
-                        <div class="form-group form-col-3"><label for="printer_repair">Printers for Repair:</label><input type="number" id="printer_repair" name="printer_repair" min="0"></div>
-                        <div class="form-group form-col-3"><label for="tv">TVs:</label><input type="number" id="tv" name="tv" min="0"></div>
-                        <div class="form-group form-col-3"><label for="tv_repair">TVs for Repair:</label><input type="number" id="tv_repair" name="tv_repair" min="0"></div>
-                        <div class="form-group form-col-3"><label for="science_lab">Science Labs:</label><input type="number" id="science_lab" name="science_lab" min="0"></div>
-                        <div class="form-group form-col-3"><label for="computer_lab">Computer Labs:</label><input type="number" id="computer_lab" name="computer_lab" min="0"></div>
-                        <div class="form-group form-col-3"><label for="tvl_lab">TVL Labs:</label><input type="number" id="tvl_lab" name="tvl_lab" min="0"></div>
-                    </div>
-                </div>
-
-                <div class="form-page" data-page="7">
-                    <h2>Teacher Specialization</h2>
-                    <div class="form-row">
-                        <div class="form-group form-col-4"><label for="english">English:</label><input type="number" id="english" name="english" min="0"></div>
-                        <div class="form-group form-col-4"><label for="math">Math:</label><input type="number" id="math" name="math" min="0"></div>
-                        <div class="form-group form-col-4"><label for="science">Science:</label><input type="number" id="science" name="science" min="0"></div>
-                        <div class="form-group form-col-4"><label for="biological_science">Biological Science:</label><input type="number" id="biological_science" name="biological_science" min="0"></div>
-                        <div class="form-group form-col-4"><label for="physical_science">Physical Science:</label><input type="number" id="physical_science" name="physical_science" min="0"></div>
-                        <div class="form-group form-col-4"><label for="general_education">General Education:</label><input type="number" id="general_education" name="general_education" min="0"></div>
-                        <div class="form-group form-col-4"><label for="araling_panlipunan">Araling Panlipunan:</label><input type="number" id="araling_panlipunan" name="araling_panlipunan" min="0"></div>
-                        <div class="form-group form-col-4"><label for="tle">TLE:</label><input type="number" id="tle" name="tle" min="0"></div>
-                        <div class="form-group form-col-4"><label for="mapeh">MAPEH:</label><input type="number" id="mapeh" name="mapeh" min="0"></div>
-                        <div class="form-group form-col-4"><label for="filipino">Filipino:</label><input type="number" id="filipino" name="filipino" min="0"></div>
-                        <div class="form-group form-col-4"><label for="esp">ESP:</label><input type="number" id="esp" name="esp" min="0"></div>
-                        <div class="form-group form-col-4"><label for="agriculture">Agriculture:</label><input type="number" id="agriculture" name="agriculture" min="0"></div>
-                        <div class="form-group form-col-4"><label for="ece">Early Childhood Ed:</label><input type="number" id="ece" name="ece" min="0"></div>
-                        <div class="form-group form-col-4"><label for="sped">SPED:</label><input type="number" id="sped" name="sped" min="0"></div>
-                    </div>
-                </div>
-
-            </main>
-
-            <footer class="button-footer">
-                <div class="form-navigation">
-                    <button type="button" id="prevBtn" class="nav-btn" style="display: none;">Previous</button>
-                    <button type="button" id="nextBtn" class="nav-btn">Next</button>
-                    <button type="submit" id="submitBtn" style="display: none;">Submit Survey</button>
-                </div>
-                <button type="button" id="clearFormBtn" class="clear-btn">Clear Entire Form</button>
-            </footer>
-
-        </form>
-    </section>
-
-    <script src="app.js"></script>
+        if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(console.error));
+        }
+    </script>
 </body>
 </html>
